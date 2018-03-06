@@ -30,6 +30,8 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.HashMap;
 import java.util.Map;
+import java.lang.Thread;
+import java.lang.Runnable;
 
 public class RNTesseractOcrModule extends ReactContextBaseJavaModule {
 
@@ -187,28 +189,32 @@ public class RNTesseractOcrModule extends ReactContextBaseJavaModule {
 	}
 
 	@ReactMethod
-	public void recognizeWithBounds(String path, String lang, @Nullable ReadableMap tessOptions, Promise promise) {
+	public void recognizeWithBounds(final String path, final String lang, @Nullable final ReadableMap tessOptions, final Promise promise) {
 		prepareTesseract();
 
 		Log.d(REACT_CLASS, "Start ocr images with bounds");
 
-		try {
-			BitmapFactory.Options options = new BitmapFactory.Options();
+		new Thread(new Runnable() {
+			public void run() {
+				try {
+					BitmapFactory.Options options = new BitmapFactory.Options();
 
-			// TODO:
-			// Check image size before use inSampleSize (maybe this could help) --> https://goo.gl/4MvBvB
-			// considering that when inSampleSize is used (usually to save memory) the ocr quality decreases
+					// TODO:
+					// Check image size before use inSampleSize (maybe this could help) --> https://goo.gl/4MvBvB
+					// considering that when inSampleSize is used (usually to save memory) the ocr quality decreases
 
-			//options.inSampleSize = 4; //inSampleSize documentation --> http://goo.gl/KRrlvi
-			Bitmap bitmap = BitmapFactory.decodeFile(path, options);
+					//options.inSampleSize = 4; //inSampleSize documentation --> http://goo.gl/KRrlvi
+					Bitmap bitmap = BitmapFactory.decodeFile(path, options);
 
-			WritableArray result = extractTextWithBounds(bitmap, lang, TessBaseAPI.PageIteratorLevel.RIL_WORD, tessOptions);
+					WritableArray result = extractTextWithBounds(bitmap, lang, TessBaseAPI.PageIteratorLevel.RIL_WORD, tessOptions);
 
-			promise.resolve(result);
-		} catch (Exception e) {
-			Log.e(REACT_CLASS, e.getMessage());
-			promise.reject("An error occurred", e.getMessage());
-		}
+					promise.resolve(result);
+				} catch (Exception e) {
+					Log.e(REACT_CLASS, e.getMessage());
+					promise.reject("An error occurred", e.getMessage());
+				}
+			}
+		}).start();
 	}
 
 	private String extractText(Bitmap bitmap, String lang, @Nullable final ReadableMap tessOptions) {
@@ -253,6 +259,7 @@ public class RNTesseractOcrModule extends ReactContextBaseJavaModule {
 		} while (it.next(level));
 
 		it.delete();
+		tessBaseApi.end();
 
 		return words;
 	}
